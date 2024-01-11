@@ -1,3 +1,6 @@
 [submodule "lib/forge-std"]
 	path = lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
+[submodule "lib/elliptic-curve-solidity.git"]
+	path = lib/elliptic-curve-solidity.git
+	url = https://github.com/witnet/elliptic-curve-solidity.git
