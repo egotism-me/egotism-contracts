@@ -13,12 +13,28 @@ library EgotismLib {
     uint256 public constant SECP256K1_BB = 7;
     uint256 public constant SECP256K1_PP =
         0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F;
+    uint256 public constant SECP256K1_ORDER = 
+        0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
 
     function isNonceValid(
         uint256 nonceX,
         uint256 nonceY
     ) internal pure returns (bool) {
-        return EllipticCurve.isOnCurve(nonceX, nonceY, SECP256K1_AA, SECP256K1_BB, SECP256K1_PP);
+        // check point is on curve
+        if(!EllipticCurve.isOnCurve(nonceX, nonceY, SECP256K1_AA, SECP256K1_BB, SECP256K1_PP)) {
+            return false;
+        }
+
+        // check that order of point is group's order
+        (uint256 xCheck, uint256 yCheck) = EllipticCurve.ecMul(
+            SECP256K1_ORDER, 
+            nonceX, 
+            nonceY, 
+            SECP256K1_AA, 
+            SECP256K1_PP
+        );
+
+        return xCheck == 0 && yCheck == 0;
     }
 
     function deriveAddress(
@@ -34,4 +50,24 @@ library EgotismLib {
     error InvalidReceiver(address receiver);
 
     error InvalidConstraint(bytes4 signature);
+
+    error InvalidConstraints();
+
+    error InvalidNonce(uint256 nonceX, uint256 nonceY);
+
+    error InvalidExpiration(uint176 expiration);
+
+    error InvalidBountyReward(uint256 expected, uint256 actual);
+
+    error InvalidSubmission();
+
+    error BountyNotPending();
+
+    error BountyExpired();
+
+    error BountyNotExpired();
+
+    error RewardTransferFailure();
+
+    error RefundTransferFailure();
 }

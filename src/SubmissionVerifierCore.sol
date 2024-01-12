@@ -13,6 +13,10 @@ abstract contract SubmissionVerifierCore is ISubmissionVerifier {
         address receiver,
         bytes calldata constraints
     ) public virtual view returns (bool) {
+        // ensures no frontrunning
+
+        // might need to switch to hashing submission + receiver for better security?
+        // need to look into if there is research on security 
         if (address(uint160(submission >> 96)) != receiver) {
             revert EgotismLib.InvalidReceiver(receiver);
         }
