@@ -88,7 +88,7 @@ contract EgotismMarket {
 
     function fulfillBounty(
         uint256 bountyId,
-        uint256 submission,
+        uint256 submissionSalt,
         address receiver
     ) external {
         // if out of range reverts?
@@ -102,6 +102,12 @@ contract EgotismMarket {
             revert EgotismLib.BountyExpired();
         }
 
+        // submission is dependant on receiver to prevent frontrunning
+        uint256 submission = EgotismLib.deriveSubmission(
+            submissionSalt,
+            receiver
+        );
+
         address result = EgotismLib.deriveAddress(
             bounty.nonceX,
             bounty.nonceY,
@@ -109,9 +115,7 @@ contract EgotismMarket {
         );
 
         bool check = bounty.verifier.verify(
-            submission,
             result,
-            receiver,
             bounty.constraints
         );
 

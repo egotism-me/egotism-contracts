@@ -47,6 +47,16 @@ library EgotismLib {
         return address(uint160(uint256(keccak256(abi.encode(x, y)))));
     }
 
+    function deriveSubmission(
+        uint256 submissionSalt,
+        address receiver
+    ) internal pure returns (uint256 submission) {
+        submission = uint256(keccak256(abi.encode(submissionSalt, receiver)));
+        if (submission >= SECP256K1_PP) {
+            revert InvalidSubmission();
+        }
+    }
+
     error InvalidReceiver(address receiver);
 
     error InvalidConstraint(bytes4 signature);

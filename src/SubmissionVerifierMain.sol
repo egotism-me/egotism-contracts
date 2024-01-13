@@ -2,21 +2,16 @@
 
 pragma solidity ^0.8.17;
 
-import { SubmissionVerifierCore } from "src/SubmissionVerifierCore.sol";
+import { ISubmissionVerifier } from "src/interfaces/ISubmissionVerifier.sol";
 import { EgotismLib } from "src/EgotismLib.sol";
 
-contract SubmissionVerifierMain is SubmissionVerifierCore {
+contract SubmissionVerifierMain is ISubmissionVerifier {
     bytes4 public constant CONSTRAINT_PATTERN_SIG = 0x00000001;
 
     function verify(
-        uint256 submission,
         address result,
-        address receiver,
         bytes calldata constraints
-    ) public view override returns (bool) {
-        // don't care about result, if not reverting then all right
-        super.verify(submission, result, receiver, constraints);
-
+    ) public pure returns (bool) {
         bytes[] memory constraintArray = abi.decode(constraints, (bytes[]));
         for (uint256 i = 0; i < constraintArray.length; i++) {
             bytes memory constraint = constraintArray[i];
