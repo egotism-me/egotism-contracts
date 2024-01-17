@@ -67,5 +67,7 @@ library EgotismLib {
 
     error RewardTransferFailure();
 
+    error Unauthorized();
+
     error RefundTransferFailure();
 }

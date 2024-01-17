@@ -140,11 +140,15 @@ contract EgotismMarket {
         // if out of range reverts?
         Bounty memory bounty = bounties[bountyId];
 
+        if (msg.sender != bounty.poster) {
+            revert EgotismLib.Unauthorized();
+        }
+
         if (bounty.status != BountyStatus.PENDING) {
             revert EgotismLib.BountyNotPending();
         }
 
-        if (bounty.expiration < block.timestamp) {
+        if (bounty.expiration > block.timestamp) {
             revert EgotismLib.BountyNotExpired();
         }
 
