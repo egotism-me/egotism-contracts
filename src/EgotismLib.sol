@@ -26,15 +26,17 @@ library EgotismLib {
         }
 
         // check that order of point is group's order
-        (uint256 xCheck, uint256 yCheck) = EllipticCurve.ecMul(
-            SECP256K1_ORDER, 
-            nonceX, 
+        // use jacobian because affine transformation fails + gas save
+        (,,uint256 zCheck) = EllipticCurve.jacMul(
+            SECP256K1_ORDER,
+            nonceX,
             nonceY, 
+            1,
             SECP256K1_AA, 
             SECP256K1_PP
         );
 
-        return xCheck == 0 && yCheck == 0;
+        return zCheck == 0;
     }
 
     function deriveAddress(
