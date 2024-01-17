@@ -50,7 +50,7 @@ contract EgotismMarket {
         ISubmissionVerifier verifier,
         bytes calldata constraints
     ) external payable returns (uint256 bountyId) {
-        if (expiration >= block.timestamp) {
+        if (expiration <= block.timestamp) {
             revert EgotismLib.InvalidExpiration(expiration);
         }
 
