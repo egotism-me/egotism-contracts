@@ -239,8 +239,10 @@ contract FulfillBounty is Test, Shared {
 
     function test_RevertWhen_BountyNotPending_Cancelled() public {
         vm.prank(POSTER);
+        vm.warp(EXPIRATION_TIMESTAMP);
         market.cancelBounty(bountyId);
         vm.expectRevert(EgotismLib.BountyNotPending.selector);
+        vm.warp(VALID_TIMESTAMP);
         market.fulfillBounty(bountyId, SUBMISSION_SALT, SUBMITTER);
     }
 
@@ -283,6 +285,88 @@ contract FulfillBounty is Test, Shared {
 }
 
 contract CancelBounty is Test, Shared {
+    uint256 constant START_TIMESTAMP = 1000;
+    uint256 constant VALID_TIMESTAMP = 2500;
+    uint256 constant EXPIRATION_TIMESTAMP = 2000;
+
+    EgotismMarket market;
+    ISubmissionVerifier mainVerifier;
+
+    uint256 bountyId;
+
+    function setUp() public {
+        mainVerifier = new SubmissionVerifierMock();
+        market = new EgotismMarket(mainVerifier);
+
+        vm.deal(POSTER, REWARD);
+        vm.prank(POSTER);
+        vm.warp(START_TIMESTAMP);
+
+        bountyId = market.createBounty{ value: REWARD }(
+            NONCE_X,
+            NONCE_Y,
+            REWARD,
+            uint176(EXPIRATION_TIMESTAMP),
+            mainVerifier,
+            CONSTRAINTS
+        );
+
+        vm.warp(VALID_TIMESTAMP);
+    }
+
+    function test_Positive() public {
+        vm.deal(POSTER, 0);
+        vm.prank(POSTER);
+
+        vm.expectEmit();
+        emit EgotismMarket.BountyCancelled(
+            bountyId,
+            POSTER,
+            REWARD
+        );
+
+        market.cancelBounty(bountyId);
+
+        assertEq(POSTER.balance, REWARD, "Incorrect refund given");
+        (,,,,,,EgotismMarket.BountyStatus status,) = market.bounties(bountyId);
+        assertEq(uint8(status), uint8(EgotismMarket.BountyStatus.CANCELLED), "Incorrect status update");
+    }
+
+    function test_RevertWhen_Unauthorized() public {
+        vm.expectRevert(EgotismLib.Unauthorized.selector);
+        market.cancelBounty(bountyId);
+    }
+
+    function test_RevertWhen_BountyNotPending_Fulfilled() public {
+        vm.warp(EXPIRATION_TIMESTAMP - 1);
+        market.fulfillBounty(bountyId, SUBMISSION_SALT, SUBMITTER);
+        vm.warp(VALID_TIMESTAMP);
+
+        vm.expectRevert(EgotismLib.BountyNotPending.selector);
+        vm.prank(POSTER);
+        market.cancelBounty(bountyId);
+    }
+
+    function test_RevertWhen_BountyNotPending_Cancelled() public {
+        vm.prank(POSTER);
+        market.cancelBounty(bountyId);
+        vm.expectRevert(EgotismLib.BountyNotPending.selector);
+        vm.prank(POSTER);
+        market.cancelBounty(bountyId);
+    }
+
+    function test_RevertWhen_BountyNotExpired() public {
+        vm.warp(START_TIMESTAMP);
+        vm.expectRevert(EgotismLib.BountyNotExpired.selector);
+        vm.prank(POSTER);
+        market.cancelBounty(bountyId);
+    }
+
+    function test_RevertWhen_RefundTransferFailure() public {
+        UnpayableMock unpayable = new UnpayableMock();
+        vm.expectRevert(EgotismLib.RefundTransferFailure.selector);
+        unpayable.createBountyAndCancel(market, mainVerifier, vm);
+    }
 }
 
 // constraints is a bool tuple,
@@ -305,4 +389,25 @@ contract SubmissionVerifierMock is ISubmissionVerifier {
     }
 }
 
-contract UnpayableMock {}
+contract UnpayableMock is Shared {
+    function createBountyAndCancel(
+        EgotismMarket market, 
+        ISubmissionVerifier mainVerifier,
+        Vm vm
+    ) external {
+        vm.deal(address(this), REWARD);
+
+        uint176 EXPIRATION = uint176(block.timestamp + 1);
+        uint256 bountyId = market.createBounty{ value: REWARD }(
+            NONCE_X,
+            NONCE_Y,
+            REWARD,
+            EXPIRATION,
+            mainVerifier,
+            CONSTRAINTS
+        );
+
+        vm.warp(EXPIRATION);
+        market.cancelBounty(bountyId);
+    }
+}
