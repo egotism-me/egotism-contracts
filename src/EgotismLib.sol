@@ -59,8 +59,6 @@ library EgotismLib {
         }
     }
 
-    error InvalidReceiver(address receiver);
-
     error InvalidConstraint(bytes4 signature);
 
     error InvalidConstraints();
