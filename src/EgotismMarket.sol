@@ -98,7 +98,7 @@ contract EgotismMarket {
             revert EgotismLib.BountyNotPending();
         }
 
-        if (bounty.expiration >= block.timestamp) {
+        if (bounty.expiration <= block.timestamp) {
             revert EgotismLib.BountyExpired();
         }
 
