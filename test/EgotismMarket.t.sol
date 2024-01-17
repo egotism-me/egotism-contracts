@@ -10,6 +10,7 @@ import { EgotismMarket } from "src/EgotismMarket.sol";
 import { EgotismLib } from "src/EgotismLib.sol";
 
 abstract contract Shared {
+    // ROLES
     address constant POSTER = address(1);
     address constant SUBMITTER = address(2);
 
@@ -18,10 +19,14 @@ abstract contract Shared {
     uint256 constant NONCE_Y = 49384988101491619794462775601349526588349137780292274540231125201115197157452;
 
     uint256 constant REWARD = 1 ether;
-    
+
     bytes CONSTRAINTS = abi.encode(true, true);
     bytes INVALID_CONSTRAINTS = abi.encode(true, false);
     bytes UNSATISFIED_CONSTRAINTS = abi.encode(false, true);
+
+    // SUBMISSION_SALT and SUBMISSION are tied
+    uint256 constant SUBMISSION_SALT = 1234;
+    uint256 constant SUBMISSION = 65309379242442000436034975801177189427509424436662457510180963480106109506156;
 }
 
 contract Constructor is Test {
@@ -90,11 +95,6 @@ contract CreateBounty is Test, Shared {
         assertEq(uint8(status), uint8(EgotismMarket.BountyStatus.PENDING), "Unexpected status");
         assertEq(constraints, CONSTRAINTS, "Unexpected constraints");
     }
-
-    // exp
-    // nonce
-    // reward
-    // constraints
 
     function test_RevertWhen_InvalidExpiration() public {
         uint176 EXPIRATION = uint176(block.timestamp - 1);
@@ -182,6 +182,109 @@ contract CreateBounty is Test, Shared {
     }
 }
 
+contract FulfillBounty is Test, Shared {
+    uint256 constant START_TIMESTAMP = 1000;
+    uint256 constant VALID_TIMESTAMP = 1500;
+    uint256 constant EXPIRATION_TIMESTAMP = 2000;
+
+    EgotismMarket market;
+    ISubmissionVerifier mainVerifier;
+
+    uint256 bountyId;
+
+    function setUp() public {
+        mainVerifier = new SubmissionVerifierMock();
+        market = new EgotismMarket(mainVerifier);
+
+        vm.deal(POSTER, REWARD);
+        vm.prank(POSTER);
+        vm.warp(START_TIMESTAMP);
+
+        bountyId = market.createBounty{ value: REWARD }(
+            NONCE_X,
+            NONCE_Y,
+            REWARD,
+            uint176(EXPIRATION_TIMESTAMP),
+            mainVerifier,
+            CONSTRAINTS
+        );
+
+        vm.warp(VALID_TIMESTAMP);
+    }
+
+    function test_Positive() public {
+        vm.deal(SUBMITTER, 0);
+
+        vm.expectEmit();
+        emit EgotismMarket.BountyFulfilled(
+            bountyId,
+            POSTER,
+            SUBMITTER,
+            REWARD,
+            SUBMISSION
+        );
+
+        market.fulfillBounty(bountyId, SUBMISSION_SALT, SUBMITTER);
+
+        assertEq(SUBMITTER.balance, REWARD, "Incorrect reward given");
+        (,,,,,,EgotismMarket.BountyStatus status,) = market.bounties(bountyId);
+        assertEq(uint8(status), uint8(EgotismMarket.BountyStatus.FULFILLED), "Incorrect status update");
+    }
+
+    function test_RevertWhen_BountyNotPending_Fulfilled() public {
+        market.fulfillBounty(bountyId, SUBMISSION_SALT, SUBMITTER);
+        vm.expectRevert(EgotismLib.BountyNotPending.selector);
+        market.fulfillBounty(bountyId, SUBMISSION_SALT, SUBMITTER);
+    }
+
+    function test_RevertWhen_BountyNotPending_Cancelled() public {
+        vm.prank(POSTER);
+        market.cancelBounty(bountyId);
+        vm.expectRevert(EgotismLib.BountyNotPending.selector);
+        market.fulfillBounty(bountyId, SUBMISSION_SALT, SUBMITTER);
+    }
+
+    function test_RevertWhen_BountyExpired() public {
+        vm.warp(EXPIRATION_TIMESTAMP);
+        vm.expectRevert(EgotismLib.BountyExpired.selector);
+        market.fulfillBounty(bountyId, SUBMISSION_SALT, SUBMITTER);
+    }
+
+    // need to find submission salt that makes deriveAddress fail
+    function test_RevertWhen_InvalidSubmission_Derive() public {
+        // TODO
+    }
+
+    function test_RevertWhen_InvalidSubmission_Constraints() public {
+        vm.deal(POSTER, REWARD);
+        vm.prank(POSTER);
+        vm.warp(START_TIMESTAMP);
+
+        bountyId = market.createBounty{ value: REWARD }(
+            NONCE_X,
+            NONCE_Y,
+            REWARD,
+            uint176(EXPIRATION_TIMESTAMP),
+            mainVerifier,
+            UNSATISFIED_CONSTRAINTS
+        );
+
+        vm.warp(VALID_TIMESTAMP);
+        vm.expectRevert(EgotismLib.InvalidSubmission.selector);
+        market.fulfillBounty(bountyId, SUBMISSION_SALT, SUBMITTER);
+    }
+
+    function test_RevertWhen_RewardTransferFailure() public {
+        UnpayableMock unpayable = new UnpayableMock();
+
+        vm.expectRevert(EgotismLib.RewardTransferFailure.selector);
+        market.fulfillBounty(bountyId, SUBMISSION_SALT, address(unpayable));
+    }
+}
+
+contract CancelBounty is Test, Shared {
+}
+
 // constraints is a bool tuple,
 // the first value mimics a constraint set that results valid verification for any result
 // the second value mimics a constraint set that is in valid form
@@ -201,3 +304,5 @@ contract SubmissionVerifierMock is ISubmissionVerifier {
         return constraintsValid;
     }
 }
+
+contract UnpayableMock {}
