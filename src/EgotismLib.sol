@@ -21,22 +21,7 @@ library EgotismLib {
         uint256 nonceY
     ) internal pure returns (bool) {
         // check point is on curve
-        if(!EllipticCurve.isOnCurve(nonceX, nonceY, SECP256K1_AA, SECP256K1_BB, SECP256K1_PP)) {
-            return false;
-        }
-
-        // check that order of point is group's order
-        // use jacobian because affine transformation fails + gas save
-        (,,uint256 zCheck) = EllipticCurve.jacMul(
-            SECP256K1_ORDER,
-            nonceX,
-            nonceY, 
-            1,
-            SECP256K1_AA, 
-            SECP256K1_PP
-        );
-
-        return zCheck == 0;
+        return EllipticCurve.isOnCurve(nonceX, nonceY, SECP256K1_AA, SECP256K1_BB, SECP256K1_PP);
     }
 
     function deriveAddress(
@@ -58,6 +43,9 @@ library EgotismLib {
             revert InvalidSubmission();
         }
     }
+
+    // sometime in the future need to think more deeply
+    // about what data is sent and what isn't in error messages
 
     error InvalidConstraint(bytes4 signature);
 
