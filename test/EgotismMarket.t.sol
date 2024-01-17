@@ -52,20 +52,16 @@ contract CreateBounty is Test, Shared {
         vm.deal(POSTER, REWARD);
         vm.prank(POSTER);
 
-        // 
-        // Having issues with event emission tests
-        // Ignore for now
-        //
-        // uint256 EXPECTED_BOUNTY_ID = 0;
-        //
-        // vm.expectEmit();
-        // emit EgotismMarket.BountyCreated(
-        //     EXPECTED_BOUNTY_ID,
-        //     POSTER,
-        //     mainVerifier,
-        //     REWARD,
-        //     EXPIRATION
-        // );
+        uint256 EXPECTED_BOUNTY_ID = 0;
+
+        vm.expectEmit();
+        emit EgotismMarket.BountyCreated(
+            EXPECTED_BOUNTY_ID,
+            POSTER,
+            mainVerifier,
+            REWARD,
+            EXPIRATION
+        );
 
         (uint256 bountyId) = market.createBounty{ value: REWARD }(
             NONCE_X,
