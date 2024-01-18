@@ -70,4 +70,8 @@ library EgotismLib {
     error Unauthorized();
 
     error RefundTransferFailure();
+
+    error InsufficentFees();
+
+    error FeesTransferFailure();
 }

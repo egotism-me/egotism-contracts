@@ -1,3 +1,4 @@
 ds-test/=lib/forge-std/lib/ds-test/src/
 elliptic-curve-solidity/=lib/elliptic-curve-solidity.git/
 forge-std/=lib/forge-std/src/
+solady/=lib/solady/
