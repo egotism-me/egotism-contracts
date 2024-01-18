@@ -4,12 +4,14 @@ pragma solidity ^0.8.17;
 
 import "forge-std/Test.sol";
 import "forge-std/console2.sol";
+import { CommonBase } from "forge-std/Base.sol";
 import { EllipticCurve } from "elliptic-curve-solidity/contracts/EllipticCurve.sol";
 import { ISubmissionVerifier } from "src/interfaces/ISubmissionVerifier.sol";
 import { EgotismMarket } from "src/EgotismMarket.sol";
 import { EgotismLib } from "src/EgotismLib.sol";
 
-abstract contract Shared {
+// CommonBase so even contracts that aren't test have access to VM
+abstract contract Shared is CommonBase {
     // ROLES
     address constant POSTER = address(1);
     address constant SUBMITTER = address(2);
@@ -31,16 +33,19 @@ abstract contract Shared {
     // SUBMISSION_SALT and SUBMISSION are tied
     uint256 constant SUBMISSION_SALT = 1234;
     uint256 constant SUBMISSION = 65309379242442000436034975801177189427509424436662457510180963480106109506156;
+
+    // STATE (for test contracts only)
+    EgotismMarket market;
+    ISubmissionVerifier mainVerifier;
+
+    function _setUp() internal {
+        mainVerifier = new SubmissionVerifierMock();
+        market = new EgotismMarket(OWNER, OWNER_ROYALTY, mainVerifier);
+    }
 }
 
 contract Constructor is Test, Shared {
-    EgotismMarket market;
-    ISubmissionVerifier verifier;
-
-    function setUp() public { 
-        verifier = new SubmissionVerifierMock();
-        market = new EgotismMarket(OWNER, OWNER_ROYALTY, verifier);
-    }
+    function setUp() public { _setUp(); }
 
     function test_owner() public {
         assertEq(market.owner(), OWNER, "Unexpected owner");
@@ -51,18 +56,12 @@ contract Constructor is Test, Shared {
     }
 
     function test_MainVerifier() public {
-        assertEq(address(market.mainVerifier()), address(verifier), "Unexpected main verifier");
+        assertEq(address(market.mainVerifier()), address(mainVerifier), "Unexpected main verifier");
     }
 }
 
 contract CreateBounty is Test, Shared {
-    EgotismMarket market;
-    ISubmissionVerifier mainVerifier;
-
-    function setUp() public {
-        mainVerifier = new SubmissionVerifierMock();
-        market = new EgotismMarket(OWNER, OWNER_ROYALTY, mainVerifier);
-    }
+    function setUp() public { _setUp(); }
 
     function test_Positive() public {
         uint176 EXPIRATION = uint176(block.timestamp + 1);
@@ -198,14 +197,10 @@ contract FulfillBounty is Test, Shared {
     uint256 constant VALID_TIMESTAMP = 1500;
     uint256 constant EXPIRATION_TIMESTAMP = 2000;
 
-    EgotismMarket market;
-    ISubmissionVerifier mainVerifier;
-
     uint256 bountyId;
 
     function setUp() public {
-        mainVerifier = new SubmissionVerifierMock();
-        market = new EgotismMarket(OWNER, OWNER_ROYALTY, mainVerifier);
+        _setUp();
 
         vm.deal(POSTER, TOTAL_MESSAGE_VALUE);
         vm.prank(POSTER);
@@ -300,12 +295,11 @@ contract CancelBounty is Test, Shared {
     uint256 constant VALID_TIMESTAMP = 2500;
     uint256 constant EXPIRATION_TIMESTAMP = 2000;
 
-    EgotismMarket market;
-    ISubmissionVerifier mainVerifier;
-
     uint256 bountyId;
 
     function setUp() public {
+        _setUp();
+
         mainVerifier = new SubmissionVerifierMock();
         market = new EgotismMarket(OWNER, OWNER_ROYALTY, mainVerifier);
 
