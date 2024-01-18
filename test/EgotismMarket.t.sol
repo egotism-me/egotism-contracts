@@ -5,6 +5,7 @@ pragma solidity ^0.8.17;
 import "forge-std/Test.sol";
 import "forge-std/console2.sol";
 import { CommonBase } from "forge-std/Base.sol";
+import { Ownable } from "solady/src/auth/Ownable.sol";
 import { EllipticCurve } from "elliptic-curve-solidity/contracts/EllipticCurve.sol";
 import { ISubmissionVerifier } from "src/interfaces/ISubmissionVerifier.sol";
 import { EgotismMarket } from "src/EgotismMarket.sol";
@@ -97,6 +98,7 @@ contract CreateBounty is Test, Shared {
         EgotismMarket.BountyStatus status,
         bytes memory constraints) = market.bounties(bountyId);
 
+        assertEq(market.fees(), FEE, "Unexpected fees");
         assertEq(nonceX, NONCE_X, "Unexpected nonceX");
         assertEq(nonceY, NONCE_Y, "Unexpected nonceY");
         assertEq(reward, REWARD, "Unexpected reward");
@@ -371,6 +373,83 @@ contract CancelBounty is Test, Shared {
         UnpayableMock unpayable = new UnpayableMock();
         vm.expectRevert(EgotismLib.RefundTransferFailure.selector);
         unpayable.createBountyAndCancel(market, mainVerifier, vm);
+    }
+}
+
+contract Withdraw is Test, Shared {
+    function setUp() public {
+        _setUp();
+
+        uint176 EXPIRATION = uint176(block.timestamp + 1);
+
+        vm.deal(POSTER, TOTAL_MESSAGE_VALUE);
+        vm.prank(POSTER);
+        market.createBounty{ value: TOTAL_MESSAGE_VALUE }(
+            NONCE_X,
+            NONCE_Y,
+            REWARD,
+            EXPIRATION,
+            mainVerifier,
+            CONSTRAINTS
+        );
+    }
+
+    function test_Positive1() public {
+        vm.deal(OWNER, 0);
+        vm.prank(OWNER);
+
+        market.withdraw(FEE);
+
+        assertEq(OWNER.balance, FEE, "Fee not transfered to owner");
+        assertEq(market.fees(), 0, "Fees remain");
+    }
+
+    function test_Positive2() public {
+        vm.deal(OWNER, 0);
+        vm.prank(OWNER);
+
+        uint256 withdrawAmount = 5 gwei;
+
+        market.withdraw(withdrawAmount);
+
+        assertEq(OWNER.balance, withdrawAmount, "Fee not transfered to owner");
+        assertEq(market.fees(), FEE - withdrawAmount, "Fees remain");
+    }
+
+    function test_RevertWhen_Unauthorized() public {
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        market.withdraw(FEE);
+    }
+
+    function test_RevertWhen_InsufficentFees() public {
+        vm.prank(OWNER);
+        vm.expectRevert(EgotismLib.InsufficentFees.selector);
+        
+        market.withdraw(FEE + 1);
+    }
+
+    function test_RevertWhen_FeesTransferFailure() public {
+        UnpayableMock unpayable = new UnpayableMock();
+
+        mainVerifier = new SubmissionVerifierMock();
+        market = new EgotismMarket(address(unpayable), OWNER_ROYALTY, mainVerifier);
+
+        uint176 EXPIRATION = uint176(block.timestamp + 1);
+
+        vm.deal(POSTER, TOTAL_MESSAGE_VALUE);
+        vm.prank(POSTER);
+        market.createBounty{ value: TOTAL_MESSAGE_VALUE }(
+            NONCE_X,
+            NONCE_Y,
+            REWARD,
+            EXPIRATION,
+            mainVerifier,
+            CONSTRAINTS
+        );
+
+        vm.prank(address(unpayable));
+        vm.expectRevert(EgotismLib.FeesTransferFailure.selector);
+        market.withdraw(FEE);
     }
 }
 
