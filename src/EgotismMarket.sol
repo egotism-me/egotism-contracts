@@ -3,6 +3,7 @@
 pragma solidity ^0.8.17;
 
 import { Ownable } from "solady/src/auth/Ownable.sol";
+import { ReentrancyGuard } from "solady/src/utils/ReentrancyGuard.sol";
 import { ISubmissionVerifier } from "src/interfaces/ISubmissionVerifier.sol";
 import { SubmissionVerifierMain } from "src/SubmissionVerifierMain.sol";
 import { EgotismLib } from "src/EgotismLib.sol";
@@ -12,10 +13,8 @@ import { EgotismLib } from "src/EgotismLib.sol";
 
 // add owner fees later
 
-// check against reentrancy attacks later (maybe worth to implement reentrancy just so it's less complex to analyze)
-
 // think of possibility to "renew" bounty after expiration since submitting initial bounty costs a lot of gas
-contract EgotismMarket is Ownable {
+contract EgotismMarket is Ownable, ReentrancyGuard {
     enum BountyStatus {
         EMPTY,
         PENDING,
@@ -56,7 +55,7 @@ contract EgotismMarket is Ownable {
         uint176 expiration,
         ISubmissionVerifier verifier,
         bytes calldata constraints
-    ) external payable returns (uint256 bountyId) {
+    ) external payable nonReentrant returns (uint256 bountyId) {
         if (expiration <= block.timestamp) {
             revert EgotismLib.InvalidExpiration(expiration);
         }
@@ -65,8 +64,6 @@ contract EgotismMarket is Ownable {
             revert EgotismLib.InvalidNonce(nonceX, nonceY);
         }
 
-        // might remove check for favour of gas?
-        // and because reentrancy complexities
         if (!verifier.verifyConstraints(constraints)) {
             revert EgotismLib.InvalidConstraints();
         }
@@ -99,7 +96,7 @@ contract EgotismMarket is Ownable {
         uint256 bountyId,
         uint256 submissionSalt,
         address receiver
-    ) external {
+    ) external nonReentrant {
         // if out of range reverts?
         Bounty memory bounty = bounties[bountyId];
 
@@ -145,7 +142,7 @@ contract EgotismMarket is Ownable {
 
     function cancelBounty(
         uint256 bountyId
-    ) external {
+    ) external nonReentrant {
         // if out of range reverts?
         Bounty memory bounty = bounties[bountyId];
 
