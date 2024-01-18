@@ -13,12 +13,16 @@ abstract contract Shared {
     // ROLES
     address constant POSTER = address(1);
     address constant SUBMITTER = address(2);
+    address constant OWNER = address(3);
 
     // [1234]G
     uint256 constant NONCE_X = 102884003323827292915668239759940053105992008087520207150474896054185180420338;
     uint256 constant NONCE_Y = 49384988101491619794462775601349526588349137780292274540231125201115197157452;
 
+    uint256 constant OWNER_ROYALTY = 100;  // 1%
     uint256 constant REWARD = 1 ether;
+    uint256 constant FEE = (REWARD / 100_00) * OWNER_ROYALTY;
+    uint256 constant TOTAL_MESSAGE_VALUE = REWARD + FEE;
 
     bytes CONSTRAINTS = abi.encode(true, true);
     bytes INVALID_CONSTRAINTS = abi.encode(true, false);
@@ -29,17 +33,25 @@ abstract contract Shared {
     uint256 constant SUBMISSION = 65309379242442000436034975801177189427509424436662457510180963480106109506156;
 }
 
-contract Constructor is Test {
+contract Constructor is Test, Shared {
     EgotismMarket market;
     ISubmissionVerifier verifier;
 
     function setUp() public { 
         verifier = new SubmissionVerifierMock();
-        market = new EgotismMarket(verifier);
+        market = new EgotismMarket(OWNER, OWNER_ROYALTY, verifier);
+    }
+
+    function test_owner() public {
+        assertEq(market.owner(), OWNER, "Unexpected owner");
+    }
+
+    function test_ownerRoyalty() public {
+        assertEq(market.ownerRoyalty(), OWNER_ROYALTY, "Unexpected owner royalty");
     }
 
     function test_MainVerifier() public {
-        assertEq(address(market.mainVerifier()), address(verifier));
+        assertEq(address(market.mainVerifier()), address(verifier), "Unexpected main verifier");
     }
 }
 
@@ -49,12 +61,12 @@ contract CreateBounty is Test, Shared {
 
     function setUp() public {
         mainVerifier = new SubmissionVerifierMock();
-        market = new EgotismMarket(mainVerifier);
+        market = new EgotismMarket(OWNER, OWNER_ROYALTY, mainVerifier);
     }
 
     function test_Positive() public {
         uint176 EXPIRATION = uint176(block.timestamp + 1);
-        vm.deal(POSTER, REWARD);
+        vm.deal(POSTER, TOTAL_MESSAGE_VALUE);
         vm.prank(POSTER);
 
         uint256 EXPECTED_BOUNTY_ID = 0;
@@ -68,7 +80,7 @@ contract CreateBounty is Test, Shared {
             EXPIRATION
         );
 
-        (uint256 bountyId) = market.createBounty{ value: REWARD }(
+        (uint256 bountyId) = market.createBounty{ value: TOTAL_MESSAGE_VALUE }(
             NONCE_X,
             NONCE_Y,
             REWARD,
@@ -143,19 +155,18 @@ contract CreateBounty is Test, Shared {
     }
 
     function test_RevertWhen_InvalidBountyReward() public {
-        uint256 badReward = 1000 gwei;
         uint176 EXPIRATION = uint176(block.timestamp + 1);
         vm.expectRevert(
             abi.encodeWithSelector(
                 EgotismLib.InvalidBountyReward.selector,
-                REWARD,
-                badReward
+                TOTAL_MESSAGE_VALUE,
+                REWARD
             )
         );
-        vm.deal(POSTER, badReward);
+        vm.deal(POSTER, REWARD);
         vm.prank(POSTER);
 
-        market.createBounty{ value: badReward }(
+        market.createBounty{ value: REWARD }(
             NONCE_X,
             NONCE_Y,
             REWARD,
@@ -194,13 +205,13 @@ contract FulfillBounty is Test, Shared {
 
     function setUp() public {
         mainVerifier = new SubmissionVerifierMock();
-        market = new EgotismMarket(mainVerifier);
+        market = new EgotismMarket(OWNER, OWNER_ROYALTY, mainVerifier);
 
-        vm.deal(POSTER, REWARD);
+        vm.deal(POSTER, TOTAL_MESSAGE_VALUE);
         vm.prank(POSTER);
         vm.warp(START_TIMESTAMP);
 
-        bountyId = market.createBounty{ value: REWARD }(
+        bountyId = market.createBounty{ value: TOTAL_MESSAGE_VALUE }(
             NONCE_X,
             NONCE_Y,
             REWARD,
@@ -258,11 +269,11 @@ contract FulfillBounty is Test, Shared {
     }
 
     function test_RevertWhen_InvalidSubmission_Constraints() public {
-        vm.deal(POSTER, REWARD);
+        vm.deal(POSTER, TOTAL_MESSAGE_VALUE);
         vm.prank(POSTER);
         vm.warp(START_TIMESTAMP);
 
-        bountyId = market.createBounty{ value: REWARD }(
+        bountyId = market.createBounty{ value: TOTAL_MESSAGE_VALUE }(
             NONCE_X,
             NONCE_Y,
             REWARD,
@@ -296,13 +307,13 @@ contract CancelBounty is Test, Shared {
 
     function setUp() public {
         mainVerifier = new SubmissionVerifierMock();
-        market = new EgotismMarket(mainVerifier);
+        market = new EgotismMarket(OWNER, OWNER_ROYALTY, mainVerifier);
 
-        vm.deal(POSTER, REWARD);
+        vm.deal(POSTER, TOTAL_MESSAGE_VALUE);
         vm.prank(POSTER);
         vm.warp(START_TIMESTAMP);
 
-        bountyId = market.createBounty{ value: REWARD }(
+        bountyId = market.createBounty{ value: TOTAL_MESSAGE_VALUE }(
             NONCE_X,
             NONCE_Y,
             REWARD,
@@ -395,10 +406,10 @@ contract UnpayableMock is Shared {
         ISubmissionVerifier mainVerifier,
         Vm vm
     ) external {
-        vm.deal(address(this), REWARD);
+        vm.deal(address(this), TOTAL_MESSAGE_VALUE);
 
         uint176 EXPIRATION = uint176(block.timestamp + 1);
-        uint256 bountyId = market.createBounty{ value: REWARD }(
+        uint256 bountyId = market.createBounty{ value: TOTAL_MESSAGE_VALUE }(
             NONCE_X,
             NONCE_Y,
             REWARD,
