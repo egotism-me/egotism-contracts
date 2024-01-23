@@ -24,7 +24,7 @@ contract SubmissionVerifierMain is ISubmissionVerifier {
                 );
 
                 bytes20 addressMasked = bytes20(result) & mask;
-                if (addressMasked != pattern) {
+                if (addressMasked != pattern & mask) {
                     return false;
                 }
             } else {
