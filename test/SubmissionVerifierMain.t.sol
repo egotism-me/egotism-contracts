@@ -4,6 +4,7 @@ pragma solidity ^0.8.17;
 
 import "forge-std/Test.sol";
 import "forge-std/console2.sol";
+import { EgotismLib } from "src/EgotismLib.sol";
 import { SubmissionVerifierMain } from "src/SubmissionVerifierMain.sol";
 
 contract Verify is Test {
@@ -143,6 +144,30 @@ contract Verify is Test {
         );
 
         assert(!success);
+    }
+
+    function test_RevertWhen_InvalidConstraint() public {
+        bytes4 INVALID_SIG = 0x12345678;
+        bytes memory constraint = abi.encode(
+            INVALID_SIG,
+            bytes20(0),
+            bytes20(0)
+        );
+
+        bytes[] memory constraints = new bytes[](1);
+        constraints[0] = constraint;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                EgotismLib.InvalidConstraint.selector,
+                INVALID_SIG
+            )
+        );
+
+        submissionVerifierMain.verify(
+            address(0),
+            abi.encode(constraints)
+        );
     }
 }
 
